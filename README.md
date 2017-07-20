@@ -4,7 +4,7 @@ Upstream Proxy
 
 Route requests to Node.js apps by hostname.
 
-Plug it to an NGINX upstream, connect it to any other service - or expose it directly to the internet (port 80 and 443). 
+Plug it to an NGINX upstream, connect it to any other service - or expose it directly to the internet (port 80 and 443).
 
 <a href="https://raw.githubusercontent.com/nodexo/upstream-proxy/master/img/upstream-proxy-standalone.png"><img src="https://raw.githubusercontent.com/nodexo/upstream-proxy/master/img/upstream-proxy-standalone-preview.png" alt="Upstream Proxy standalone" width="125" /></a>
 <a href="https://raw.githubusercontent.com/nodexo/upstream-proxy/master/img/nginx-upstream-proxy.png"><img src="https://raw.githubusercontent.com/nodexo/upstream-proxy/master/img/nginx-upstream-proxy-preview.png" alt="NGINX with Upstream Proxy" width="125" /></a>
@@ -46,11 +46,19 @@ let myConfig = [
     }
 ];
 
-let proxy = new upstreamProxy(myConfig);
+let proxy = new upstreamProxy(myConfig, {}, function statsHandler(stats) {
+  // stats contains = {
+  //  "host": "<hostname>",
+  //  "bytesRead": "...",     // amount of bytes read
+  //  "bytesWritten": "...",  // amount of bytes written
+  //  }
+});
 proxy.listen(3000).start();
 ```
 
-If you want to catch all requests that don't match any given host name, 
+The statsHandler can be used to collect data on the hostnames (amount of traffic).
+
+If you want to catch all requests that don't match any given host name,
 you can use an asterisk:
 
 ```javascript
@@ -191,7 +199,7 @@ Example:
 let liveRoutes = proxy.getRoutes();
 
 //liveRoutes is of type Map()
-console.log( JSON.stringify([...liveRoutes], null, 2) ); 
+console.log( JSON.stringify([...liveRoutes], null, 2) );
 /*
 [
   [ "localhost", { "host": "127.0.0.1", "port": 3001 } ]
@@ -220,8 +228,8 @@ console.log( result );
 // OK
 ```
 
-Here, each request that normally would be closed by the proxy with a HTTP status 503 is handed back 
-to "myError503" - passing back the socket object and the host name string. Now it's your responsibility 
+Here, each request that normally would be closed by the proxy with a HTTP status 503 is handed back
+to "myError503" - passing back the socket object and the host name string. Now it's your responsibility
 to handle the request, for example:
 
 ```js
