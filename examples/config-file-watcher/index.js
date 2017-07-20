@@ -2,13 +2,16 @@
 'use strict';
 
 const fs = require('fs');
-const upstreamProxy = require('upstream-proxy');
+const upstreamProxy = require('../../index');
 const chokidar = require('chokidar');
 
-const PORT = 3000;
+const PORT = 80;
 const configFile = './config.json';
 
-let proxy = new upstreamProxy();
+let proxy = new upstreamProxy({}, {}, function statHandler(stats) {
+  console.log("GOT");
+  console.log(stats);
+});
 
 let setConfigFromFile = () => {
   fs.readFile(configFile, 'utf8', (err, data) => {

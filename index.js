@@ -23,7 +23,7 @@ class UpstreamProxy {
     * @param {Object} callbacks - Sets callbacks for external error handling.
     * @return {Object}
     */
-  constructor(config = {}, callbacks = {}) {
+  constructor(config = {}, callbacks = {}, statsHandler = null) {
 
     this.active = false;
     this.id = 0;
@@ -42,14 +42,20 @@ class UpstreamProxy {
 
     try {
       this.config = config;
-      this.routes = this._generateRoutesMap(this.config); 
-    } 
+      this.routes = this._generateRoutesMap(this.config);
+    }
     catch(e) {};
 
     try {
       this.callbacks = callbacks;
-    } 
+    }
     catch(e) {};
+
+    try {
+      this.statsHandler = statsHandler;
+    } catch(err) {
+      console.error(err);
+    }
 
     let server = net.createServer((socket) => this._handleConnection(socket));
     server.start = () => this.start();
@@ -92,6 +98,7 @@ class UpstreamProxy {
     if (data instanceof Buffer === false || data.length < 1) {
       return socket.end(this._httpResponse(400));
     }
+
     let host_header = this._getHostHeader(data);
     let route = this.routes.get(host_header);
     if (!route) {
@@ -116,8 +123,8 @@ class UpstreamProxy {
 
     backend.on('connect', () => {
       this._addConnection(socket, host_header);
-      socket.on('error', () => { this._removeConnection(socket, backend); });
-      backend.on('close', () => { this._removeConnection(socket, backend); });
+      socket.on('error', () => { this._removeConnection(host_header, socket, backend); });
+      backend.on('close', () => { this._removeConnection(host_header, socket, backend); });
       backend.write(data);
       socket.pipe(backend).pipe(socket);
     });
@@ -132,7 +139,8 @@ class UpstreamProxy {
    */
   _getHostHeader(data) {
     if (data[0] === 22) { //secure
-      return this.routes.get(sni(data));
+      return sni(data);
+      //return this.routes.get(sni(data));
     } else {
       let result = data.toString('utf8').match(/^(H|h)ost: (\[[^\]]*\]|[^ \:\r\n]+)/im);
       if (result) {
@@ -159,9 +167,18 @@ class UpstreamProxy {
    * @param {Object} socket
    * @param {Object} backend
    */
-  _removeConnection(socket, backend) {
+  _removeConnection(hostHeader, socket, backend) {
     this.host_headers[socket[this.symHostHeader]].delete(socket[this.symId]);
     this.sockets.delete(socket[this.symId]);
+
+    if (this.statsHandler) {
+      this.statsHandler({
+        "host": hostHeader,
+        "bytesRead": backend.bytesRead,
+        "bytesWritten": backend.bytesWritten
+      });
+    }
+
     socket.end();
     socket.unref();
     backend.end();
@@ -205,7 +222,7 @@ class UpstreamProxy {
         i++;
       } catch (e) {
         //console.log(e);
-      }  
+      }
     }
     return i;
   }
