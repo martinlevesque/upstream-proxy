@@ -101,12 +101,28 @@ class UpstreamProxy {
 
     let host_header = this._getHostHeader(data);
     let route = this.routes.get(host_header);
-    if (!route) {
-      route = this.routes.get('*');
-      if (!route) {
+
+    if ( ! route) {
+      let wildcardFound = false;
+
+      for (let r of this.routes) {
+        let routeHost = r[0];
+        let pattern = routeHost.replace("*", "[^.\\s]+");
+
+        let res = host_header.match(new RegExp(pattern))
+
+        if (res && res.length) {
+          host_header = r[0];
+          wildcardFound = true;
+          break;
+        }
+      }
+
+      if ( ! wildcardFound) {
         return socket.end(this._httpResponse(404));
       }
-      host_header = '*';
+
+      route = this.routes.get(host_header);
     }
 
     let backend = new net.Socket();

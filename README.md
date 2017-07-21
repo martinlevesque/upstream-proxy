@@ -58,8 +58,7 @@ proxy.listen(3000).start();
 
 The statsHandler can be used to collect data on the hostnames (amount of traffic).
 
-If you want to catch all requests that don't match any given host name,
-you can use an asterisk:
+If you want to define wildcard hosts, you can use an asterisk:
 
 ```javascript
 let myConfig = [
@@ -68,7 +67,7 @@ let myConfig = [
     ...
     {
         name: 'catch-all',
-        hostnames: [ '*' ],
+        hostnames: [ '*.mydomain.com' ],
         endpoint: { host: '127.0.0.1', port: 3999 }
     }
 ];
