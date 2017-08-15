@@ -42,9 +42,11 @@ class UpstreamProxy {
 
     try {
       this.config = config;
-      this.routes = this._generateRoutesMap(this.config);
+      [this.routes, this.handlers] = this._generateRoutesMap(this.config);
     }
-    catch(e) {};
+    catch(e) {
+      console.error(e);
+    };
 
     try {
       this.callbacks = callbacks;
@@ -100,6 +102,11 @@ class UpstreamProxy {
     }
 
     let host_header = this._getHostHeader(data);
+
+    if ( ! host_header) {
+      return socket.end(this._httpResponse(500));
+    }
+
     let route = this.routes.get(host_header);
 
     if ( ! route) {
@@ -125,27 +132,49 @@ class UpstreamProxy {
       route = this.routes.get(host_header);
     }
 
-    let backend = new net.Socket();
+    let handlerPromise = this.handlers.get(host_header);
 
-    backend.once('error', (err) => {
-      backend.destroy();
-      const status = 503;
-      if (this.callbacks[status]) {
-        this.callbacks[status](socket, host_header);
-      } else {
-        socket.end(this._httpResponse(status));
+    if ( ! handlerPromise) {
+      handlerPromise = function() {
+        return new Promise((resolve) => resolve());
+      };
+    }
+
+    handlerPromise().then(() => {
+      let backend = new net.Socket();
+
+      backend.once('error', (err) => {
+        backend.destroy();
+        const status = 503;
+        if (this.callbacks[status]) {
+          this.callbacks[status](socket, host_header);
+        } else {
+          //throw new Error("There was an error and without err callback: " + err);
+          try {
+            socket.end(this._httpResponse(500));
+          } catch(err) {
+            console.log(err);
+          }
+        }
+      });
+
+      backend.on('connect', () => {
+        this._addConnection(socket, host_header);
+        socket.on('error', () => { this._removeConnection(host_header, socket, backend); });
+        backend.on('close', () => { this._removeConnection(host_header, socket, backend); });
+        backend.write(data);
+        socket.pipe(backend).pipe(socket);
+      });
+
+      backend.connect(route);
+    }).catch((err) => {
+      console.log(err);
+      try {
+        socket.end(this._httpResponse(500));
+      } catch(err2) {
+        console.log(err2);
       }
-    });
-
-    backend.on('connect', () => {
-      this._addConnection(socket, host_header);
-      socket.on('error', () => { this._removeConnection(host_header, socket, backend); });
-      backend.on('close', () => { this._removeConnection(host_header, socket, backend); });
-      backend.write(data);
-      socket.pipe(backend).pipe(socket);
-    });
-
-    backend.connect(route);
+    })
   }
 
   /**
@@ -207,6 +236,7 @@ class UpstreamProxy {
    */
   _generateRoutesMap(config) {
     let routes = new Map();
+    let handlers = new Map();
     if (config instanceof Array) {
       for (let obj of config) {
         if (obj.endpoint && obj.endpoint.path) {
@@ -216,12 +246,13 @@ class UpstreamProxy {
         for (let host of hosts) {
           if (obj.endpoint) {
             routes.set(host, obj.endpoint);
+            handlers.set(host, obj.handler);
             this.host_headers[host] = new Map();
           }
         }
       }
     }
-    return routes;
+    return [routes, handlers];
   }
 
   /**
@@ -273,7 +304,7 @@ class UpstreamProxy {
   setConfig(config = {}) {
     try {
       this.config = config;
-      this.routes = this._generateRoutesMap(this.config);
+      [this.routes, this.handlers] = this._generateRoutesMap(this.config);
       return 'OK';
     } catch (e) {
       return 'ERROR: ' + e.message;

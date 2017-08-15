@@ -42,9 +42,15 @@ let myConfig = [
     {
         name: 'app-1',
         hostnames: [ 'localhost' ],
-        endpoint: { host: '127.0.0.1', port: 3001 }
+        endpoint: { host: '127.0.0.1', port: 3001 },
+        handler: function() {
+          return new Promise((resolve, reject) => resolve(););
+        }
     }
 ];
+
+handler is a function returning a promise. It is executed before accepting a
+connection. So if the promise is rejected, the connection will be rejected.
 
 let proxy = new upstreamProxy(myConfig, {}, function statsHandler(stats) {
   // stats contains = {
@@ -58,7 +64,8 @@ proxy.listen(3000).start();
 
 The statsHandler can be used to collect data on the hostnames (amount of traffic).
 
-If you want to define wildcard hosts, you can use an asterisk:
+If you want to catch all requests that don't match any given host name,
+you can use an asterisk:
 
 ```javascript
 let myConfig = [
@@ -67,7 +74,7 @@ let myConfig = [
     ...
     {
         name: 'catch-all',
-        hostnames: [ '*.mydomain.com' ],
+        hostnames: [ '*' ],
         endpoint: { host: '127.0.0.1', port: 3999 }
     }
 ];
@@ -157,7 +164,10 @@ let myConfig = [
     {
         name: 'app-1',
         hostnames: [ 'localhost' ],
-        endpoint: { host: '127.0.0.1', port: 3001 }
+        endpoint: { host: '127.0.0.1', port: 3001 },
+        handler: function () {
+          return new Promise((resolve, reject) => resolve();)
+        }
     }
 ];
 

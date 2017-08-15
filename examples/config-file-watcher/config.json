@@ -2,7 +2,7 @@
 [
     {
         "name": "app-1",
-        "hostnames": [ "*ocalhost" ],
+        "hostnames": [ "localhost" ],
         "endpoint": { "host": "127.0.0.1", "port": 3001 }
     }
 ]
