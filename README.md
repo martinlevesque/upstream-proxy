@@ -49,9 +49,6 @@ let myConfig = [
     }
 ];
 
-handler is a function returning a promise. It is executed before accepting a
-connection. So if the promise is rejected, the connection will be rejected.
-
 let proxy = new upstreamProxy(myConfig, {}, function statsHandler(stats) {
   // stats contains = {
   //  "host": "<hostname>",
@@ -61,6 +58,9 @@ let proxy = new upstreamProxy(myConfig, {}, function statsHandler(stats) {
 });
 proxy.listen(3000).start();
 ```
+
+handler is a function returning a promise. It is executed before accepting a
+connection. So if the promise is rejected, the connection will be rejected.
 
 The statsHandler can be used to collect data on the hostnames (amount of traffic).
 
