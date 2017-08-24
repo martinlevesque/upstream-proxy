@@ -114,6 +114,11 @@ class UpstreamProxy {
 
       for (let r of this.routes) {
         let routeHost = r[0];
+
+        if (routeHost && routeHost.indexOf("*") === -1) {
+          continue;
+        }
+
         let pattern = routeHost.replace("*", "[^.\\s]+");
 
         let res = host_header.match(new RegExp(pattern))
