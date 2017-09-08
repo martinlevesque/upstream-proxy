@@ -156,7 +156,6 @@ class UpstreamProxy {
    * @param {Buffer} data
    */
   _handleData(socket, data) {
-    let d1 = new Date();
     if (data instanceof Buffer === false || data.length < 1) {
       return socket.end(this._httpResponse(400));
     }
