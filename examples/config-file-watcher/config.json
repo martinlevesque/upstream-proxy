@@ -2,7 +2,12 @@
 [
     {
         "name": "app-1",
-        "hostnames": [ "localhost" ],
+        "hostnames": [ "*.myhost.com" ],
+        "endpoint": { "host": "127.0.0.1", "port": 3001 }
+    },
+    {
+        "name": "app-2",
+        "hostnames": [ "myhost.com" ],
         "endpoint": { "host": "127.0.0.1", "port": 3001 }
     }
 ]

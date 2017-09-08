@@ -31,6 +31,7 @@ class UpstreamProxy {
     this.symHostHeader = Symbol('host_header');
     this.host_headers = {};
     this.sockets = new Map();
+    this.wildcardLookup = new Map();
 
     this.status_codes = new Map([
       [400, 'Bad Request'],
@@ -91,50 +92,79 @@ class UpstreamProxy {
     socket.once('data', (data) => this._handleData(socket, data));
   }
 
+  _findHostHeader(data, socket) {
+
+    let host_header = null;
+    let route = null;
+
+    try {
+      host_header = this._getHostHeader(data);
+
+      if ( ! host_header) {
+        return [null, null];
+      }
+
+      route = this.routes.get(host_header);
+
+      if ( ! route) {
+        let wildcardFound = false;
+
+        // check if we have it in the fast lookup
+        if (this.wildcardLookup.get(host_header)) {
+          host_header = this.wildcardLookup.get(host_header);
+          wildcardFound = true;
+        } else {
+          for (let r of this.routes) {
+            let routeHost = r[0];
+
+            if (routeHost && routeHost.indexOf("*") === -1) {
+              continue;
+            }
+
+            let pattern = routeHost.replace("*", "[^.\\s]+");
+
+            let res = host_header.match(new RegExp(pattern))
+
+            if (res && res.length) {
+              this.wildcardLookup.set(host_header, r[0]);
+
+              host_header = r[0];
+              wildcardFound = true;
+              break;
+            }
+          }
+        }
+
+        if ( ! wildcardFound) {
+          return [null, null];
+        }
+
+        route = this.routes.get(host_header);
+      }
+    } catch(err) {
+      console.log(err);
+      host_header = null;
+      route = null;
+    }
+
+    return [host_header, route];
+  }
+
   /**
    * Handles data from connection handler
    * @param {Object} socket
    * @param {Buffer} data
    */
   _handleData(socket, data) {
+    let d1 = new Date();
     if (data instanceof Buffer === false || data.length < 1) {
       return socket.end(this._httpResponse(400));
     }
 
-    let host_header = this._getHostHeader(data);
+    let [host_header, route] = this._findHostHeader(data);
 
     if ( ! host_header) {
       return socket.end(this._httpResponse(500));
-    }
-
-    let route = this.routes.get(host_header);
-
-    if ( ! route) {
-      let wildcardFound = false;
-
-      for (let r of this.routes) {
-        let routeHost = r[0];
-
-        if (routeHost && routeHost.indexOf("*") === -1) {
-          continue;
-        }
-
-        let pattern = routeHost.replace("*", "[^.\\s]+");
-
-        let res = host_header.match(new RegExp(pattern))
-
-        if (res && res.length) {
-          host_header = r[0];
-          wildcardFound = true;
-          break;
-        }
-      }
-
-      if ( ! wildcardFound) {
-        return socket.end(this._httpResponse(404));
-      }
-
-      route = this.routes.get(host_header);
     }
 
     let handlerPromise = this.handlers.get(host_header);
@@ -310,6 +340,7 @@ class UpstreamProxy {
     try {
       this.config = config;
       [this.routes, this.handlers] = this._generateRoutesMap(this.config);
+      this.wildcardLookup = new Map();
       return 'OK';
     } catch (e) {
       return 'ERROR: ' + e.message;

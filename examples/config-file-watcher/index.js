@@ -18,6 +18,7 @@ let setConfigFromFile = () => {
     if (err) throw err;
     let result = proxy.setConfig( JSON.parse(data) );
     console.log( `Config set: ${result}` );
+    console.log(data);
   });
 }
 
