@@ -199,8 +199,15 @@ class UpstreamProxy {
         backend.write(data);
         socket.pipe(backend).pipe(socket);
       });
-
-      backend.connect(route);
+      try {
+        backend.connect(route);
+      } catch(err) {
+        console.log(err);
+        //catch connection errors like 
+        // - ENOTFOUND when a DNS lookup fails
+        // - ECONNREFUSED when the connection attempt is rejected
+        // - others?
+      }
     }).catch((err) => {
       console.log(err);
       try {
